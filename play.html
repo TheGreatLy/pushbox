@@ -1,0 +1,383 @@
+<html>
+
+<body>
+    <style type="text/css">
+        #playtable {
+            text-align: center;
+            wdith: 100%;
+            background: #b9b9b9;
+        }
+    </style>
+
+    <div id="playtable"></div>
+    <div id="msg"></div>
+    Level :
+    <input type="text" id="level" style="width:30px;" value="1" />
+    <button onclick="check(document.getElementById('level').value)" style="width:30px;">Go</button>
+    <br /> Step &nbsp;:
+    <input type="text" id="step" style="width:30px;" readonly value="0" /> &nbsp;
+    <button onclick="back();">Back</button>
+    <br />
+
+    <a onclick="set_msg('help')">Help</a> <a onclick="set_msg('setting')">Setting</a>
+
+    <script type="text/javascript" src="mapdat.js"></script>
+    <script type="text/javascript">
+        document.body.scroll = 'no';
+        //弃用，后面通过set_img_theme()设置            
+        //            var floor_img="floor.png";
+        //            var box_img="box.png";
+        //            var wall_img="wall.png";
+        //            var man_img="man.png";
+        //            var destination_img="destination.png";
+
+        var x_now, y_now, x, y, dx = 0,
+            dy = 0;
+        var tablecode, empty_destination;
+        var map, level = 0,
+            moved = false;
+        var footsteps, step_num;
+        var help_showed = false,
+            win_showed = false,
+            setting_showed = false;
+
+        read_map(0);
+
+        function check(num) {
+            if (num <= dat_map.length && num > 0) {
+                level = document.getElementById("level").value - 1;
+                read_map(level);
+            } else alert("the number must in 1 to" + dat_map.length);
+        }
+
+        function read_map(level) {
+            //读取地图
+            tablecode = "", empty_destination = 0;
+            map = [], footsteps = [], step_num = 0;
+            document.getElementById("step").value = 0;
+            document.getElementById("level").value = level + 1;
+
+            var toline = dat_map[level].split("|");
+            if (toline[0].length > 11) set_img_theme("default", 16);
+            else set_img_theme("default", 20);
+            for (y = 0; y < toline.length; y++) {
+                map[y] = [];
+                for (x = 0; x < toline[0].length; x++) map[y][x] = toline[y].slice(x, x + 1);
+            }
+
+            for (y = 0; y < map.length; y++) {
+
+                for (x = 0; x < map[0].length; x++) {
+
+                    switch (map[y][x]) {
+                    case "w":
+                        img = wall_img;
+                        break;
+                    case "b":
+                        img = box_img;
+                        break;
+                    case "m":
+                        img = man_img;
+                        x_now = x;
+                        y_now = y;
+                        map[y][x] = " ";
+                        break;
+                    case " ":
+                        img = floor_img;
+                        break;
+                    case "x":
+                        img = destination_img;
+                        empty_destination++;
+                        break;
+                    }
+                    tablecode = tablecode + "<img id=\"" + x + "-" + y + "\" src=\"" + img + "\">"
+                }
+                tablecode = tablecode + "<br>";
+            }
+            document.getElementById("playtable").innerHTML = tablecode;
+            tablecode = "";
+        }
+
+        function man_move() {
+
+            var around = [],
+                moved = false;
+
+            if (get_next_map() == (" ") || get_next_map() == ("x")) {
+                around = [get_now_map(), get_next_map()];
+                save_footsteps();
+                set_next_img(man_img);
+                switch (around.join("")) {
+                case "  ":
+                    set_now_img(floor_img);
+                    break;
+                case " x":
+                    set_now_img(floor_img);
+                    break;
+                case "x ":
+                    set_now_img(destination_img);
+                    break;
+                case "xx":
+                    set_now_img(destination_img);
+                    break;
+                }
+                x_now += dx;
+                y_now += dy;
+                moved = true;
+            } else if ((get_next_map() == "b" || get_next_map() == ("x&b")) && (get_afternext_map() == " " || get_afternext_map() == "x")) {
+                around = [get_now_map(), get_next_map(), get_afternext_map()];
+                save_footsteps();
+                set_next_img(man_img);
+                set_afternext_img(box_img);
+                switch (around.join("")) {
+                case " b ":
+                    {
+                        set_now_img(floor_img);
+                        set_next_map(" ");
+                        set_afternext_map("b");
+                        break;
+                    }
+                case " bx":
+                    {
+                        set_now_img(floor_img);
+                        set_next_map(" ");
+                        set_afternext_map("x&b");
+                        empty_destination--;
+                        break;
+                    }
+                case " x&b ":
+                    {
+                        set_now_img(floor_img);
+                        set_next_map("x");
+                        set_afternext_map("b");
+                        empty_destination++;
+                        break;
+                    }
+                case "xb ":
+                    {
+                        set_now_img(destination_img);
+                        set_next_map(" ");
+                        set_afternext_map("b");
+                        break;
+                    }
+                case " x&bx":
+                    {
+                        set_now_img(floor_img);
+                        set_next_map("x");
+                        set_afternext_map("x&b");
+                        break;
+                    }
+                case "xx&b ":
+                    {
+                        set_now_img(destination_img);
+                        set_next_map("x");
+                        set_afternext_map("b");
+                        empty_destination++;
+                        break;
+                    }
+                case "xbx":
+                    {
+                        set_now_img(destination_img);
+                        set_next_map(" ");
+                        set_afternext_map("x&b");
+                        empty_destination--;
+                        break;
+                    }
+                case "xx&bx":
+                    {
+                        set_now_img(destination_img);
+                        set_next_map("x");
+                        set_afternext_map("x&b");
+                        break;
+                    }
+                }
+                x_now += dx;
+                y_now += dy;
+                moved = true;
+            } else moved = false;
+
+            if (moved) document.getElementById("step").value++;
+            if (empty_destination == 0) {
+                set_msg("win");
+                read_map(++level);
+            }
+            return moved;
+        }
+
+
+        function hotkey(evt) {
+            //同时支持方向键和w a s d
+            //var key=window.event.keyCode; 
+            //上一行仅对IE有效，下面的写法可兼容FF
+            //同时需为本函数添加一个参数，此处添加的为evt
+            var key = window.event ? evt.keyCode : evt.which;
+
+            if (key == 65 || key == 37) {
+                dx = -1, dy = 0;
+                man_move();
+            } //left
+            else if (key == 68 || key == 39) {
+                dx = 1, dy = 0;
+                man_move();
+            } //right
+            else if (key == 83 || key == 40) {
+                dx = 0, dy = 1;
+                man_move();
+            } //down
+            else if (key == 87 || key == 38) {
+                dx = 0, dy = -1;
+                man_move();
+            } //up
+            else if (key == 66) back(); //撤销
+            //原本dx dy 应该是man_move()的参数
+            //但为了使代码更易读==>写了set_now_img() set_now_map()等函数，进而，为减少参数传递==>使这两个变量为公有
+        }
+
+        document.onkeydown = hotkey;
+        //level.onkeydown=;
+        function back() {
+            //撤销一步
+            if (step_num > 0) {
+
+                step_num--;
+                x_now = footsteps[step_num][0][0], y_now = footsteps[step_num][0][1];
+                dx = footsteps[step_num][1][0], dy = footsteps[step_num][1][1];
+
+                switch (footsteps[step_num][2].join("")) {
+                case " bx":
+                    empty_destination++;
+                    break;
+                case " x&b ":
+                    empty_destination--;
+                    break;
+                case "xx&b ":
+                    empty_destination--;
+                    break;
+                case "xbx":
+                    empty_destination++;
+                    break;
+                }
+
+                set_now_map(footsteps[step_num][2][0]), set_next_map(footsteps[step_num][2][1]), set_afternext_map(footsteps[step_num][2][2])
+                set_now_img(footsteps[step_num][3][0]), set_next_img(footsteps[step_num][3][1]), set_afternext_img(footsteps[step_num][3][2])
+
+                document.getElementById("step").value--;
+            }
+        }
+
+        function save_footsteps() {
+            //保存足迹信息
+            footsteps[step_num] = [];
+            footsteps[step_num][0] = [x_now, y_now];
+            footsteps[step_num][1] = [dx, dy];
+            footsteps[step_num][2] = [get_now_map(), get_next_map(), get_afternext_map()];
+            footsteps[step_num][3] = [get_now_img(), get_next_img(), get_afternext_img()];
+            step_num++;
+        }
+
+
+        function set_img_theme(theme, size) {
+            //设置图片样式与型号
+            var path = "./img";
+            floor_img = path + "/" + theme + '/' + size + "/floor.png";
+            box_img = path + "/" + theme + '/' + size + "/box.png";
+            wall_img = path + "/" + theme + '/' + size + "/wall.png";
+            man_img = path + "/" + theme + '/' + size + "/man.png";
+            destination_img = path + "/" + theme + '/' + size + "/destination.png";
+        }
+
+        function set_msg(str) {
+                //显示指定信息
+                switch (str) {
+                case "help":
+                    if (help_showed == true) {
+                        str = "";
+                        help_showed = false;
+                    } else {
+                        str = "keyboard:<br />up:w or up<br />down:s or down<br />left:a or left<br />right:d or right<br />";
+                        help_showed = true;
+                        win_showed = false;
+                        setting_showed = false;
+                    }
+                    break;
+                case "win":
+                    if (win_showed == true) {
+                        str = "";
+                        win_showed = false;
+                    } else {
+                        win_showed = true;
+                        help_showed = false;
+                        setting_showed = false;
+                        str = "Good pusher!";
+                        t = setTimeout("set_msg('win')", 3000);
+                    }
+                    break;
+                case "setting":
+                    if (setting_showed == true) {
+                        str = "";
+                        setting_showed = false;
+                    } else {
+                        setting_showed = true;
+                        help_showed = false;
+                        win_showed = false;
+                        str = "Themes choose:\n<button onclick=\"set_msg('setting');alert('saved')\">save</button>";
+                    }
+                    break;
+                default:
+                    str = "";
+                }
+                document.getElementById("msg").innerHTML = str;
+            }
+            //=====为简洁和易读而写的函数=========
+        function set_now_img(img) {
+            document.getElementById(x_now + "-" + y_now).src = img;
+        }
+
+        function set_next_img(img) {
+            document.getElementById((x_now + dx) + "-" + (y_now + dy)).src = img;
+        }
+
+        function set_afternext_img(img) {
+            document.getElementById((x_now + 2 * dx) + "-" + (y_now + 2 * dy)).src = img;
+        }
+
+        function set_now_map(str) {
+            map[y_now][x_now] = str;
+        }
+
+        function set_next_map(str) {
+            map[y_now + dy][x_now + dx] = str;
+        }
+
+        function set_afternext_map(str) {
+                map[y_now + 2 * dy][x_now + 2 * dx] = str;
+            }
+            //----------------------------------
+        function get_now_img() {
+            return document.getElementById(x_now + "-" + y_now).src;
+        }
+
+        function get_next_img() {
+            return document.getElementById((x_now + dx) + "-" + (y_now + dy)).src;
+        }
+
+        function get_afternext_img() {
+            return document.getElementById((x_now + 2 * dx) + "-" + (y_now + 2 * dy)).src;
+        }
+
+        function get_now_map() {
+            return map[y_now][x_now];
+        }
+
+        function get_next_map() {
+            return map[y_now + dy][x_now + dx];
+        }
+
+        function get_afternext_map() {
+                return map[y_now + 2 * dy][x_now + 2 * dx];
+            }
+            //==================================
+    </script>
+</body>
+
+</html>
